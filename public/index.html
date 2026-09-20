@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>سولا | Sola AI</title>
+
+  <style>
+    *{box-sizing:border-box}
+
+    body{
+      margin:0;
+      background:#07111f;
+      color:#fff;
+      font-family:Arial,sans-serif;
+      min-height:100vh;
+    }
+
+    header{
+      padding:20px;
+      text-align:center;
+      background:#0b1b30;
+      border-bottom:1px solid #183452;
+    }
+
+    header h1{
+      margin:0;
+      color:#55b7ff;
+      font-size:30px;
+    }
+
+    header p{
+      margin:7px 0 0;
+      color:#a9bdd2;
+    }
+
+    #chat{
+      max-width:800px;
+      margin:auto;
+      padding:18px;
+      min-height:65vh;
+    }
+
+    .msg{
+      padding:13px 16px;
+      margin:12px 0;
+      border-radius:16px;
+      line-height:1.7;
+      white-space:pre-wrap;
+    }
+
+    .user{
+      background:#124d78;
+      margin-right:15%;
+    }
+
+    .sola{
+      background:#10243a;
+      margin-left:10%;
+    }
+
+    .image{
+      max-width:100%;
+      border-radius:15px;
+      margin-top:10px;
+    }
+
+    .bottom{
+      position:sticky;
+      bottom:0;
+      background:#07111f;
+      padding:12px;
+      border-top:1px solid #183452;
+    }
+
+    .bar{
+      max-width:800px;
+      margin:auto;
+      display:flex;
+      gap:8px;
+    }
+
+    input{
+      flex:1;
+      min-width:0;
+      padding:15px;
+      border:1px solid #31516e;
+      border-radius:15px;
+      background:#0d2035;
+      color:white;
+      font-size:16px;
+      outline:none;
+    }
+
+    button{
+      border:0;
+      border-radius:15px;
+      padding:0 16px;
+      background:#1687d9;
+      color:white;
+      font-size:20px;
+      cursor:pointer;
+    }
+
+    #mic{
+      background:#25435d;
+    }
+
+    button:disabled{
+      opacity:.5;
+    }
+
+    .welcome{
+      text-align:center;
+      margin-top:80px;
+      color:#9eb4c9;
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+  <h1>سولا 💙</h1>
+  <p>مساعدتك العربية الذكية</p>
+</header>
+
+<main id="chat">
+  <div class="welcome">
+    <h2>هلا بيك 👋</h2>
+    <p>اكتبلي أو اضغط 🎤 واحچي وياي.</p>
+    <p>وأكدر أساعدك وأصنع صور أيضًا 🖼️</p>
+  </div>
+</main>
+
+<div class="bottom">
+  <div class="bar">
+
+    <button id="mic" onclick="listen()">🎤</button>
+
+    <input
+      id="input"
+      placeholder="اكتب رسالتك لسولا..."
+      autocomplete="off"
+      onkeydown="if(event.key==='Enter') send()"
+    >
+
+    <button id="send" onclick="send()">➤</button>
+
+  </div>
+</div>
+
+<script>
+const chat = document.getElementById("chat");
+const input = document.getElementById("input");
+const sendBtn = document.getElementById("send");
+
+function addMessage(text, who){
+  const div = document.createElement("div");
+  div.className = "msg " + who;
+  div.textContent = text;
+  chat.appendChild(div);
+  window.scrollTo(0,document.body.scrollHeight);
+  return div;
+}
+
+function addImage(src){
+  const div = document.createElement("div");
+  div.className = "msg sola";
+
+  const img = document.createElement("img");
+  img.className = "image";
+  img.src = src;
+
+  div.appendChild(img);
+  chat.appendChild(div);
+
+  window.scrollTo(0,document.body.scrollHeight);
+}
+
+async function send(){
+  const message = input.value.trim();
+
+  if(!message) return;
+
+  input.value = "";
+
+  addMessage(message,"user");
+
+  sendBtn.disabled = true;
+
+  const thinking = addMessage("سولا تفكر... 🤔","sola");
+
+  try{
+
+    const response = await fetch("/api/sola",{
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json"
+      },
+      body:JSON.stringify({
+        message:message
+      })
+    });
+
+    const data = await response.json();
+
+    thinking.remove();
+
+    if(data.reply){
+      addMessage(data.reply,"sola");
+    }
+
+    if(data.url){
+      addImage(data.url);
+    }
+
+    if(data.audio){
+      const audio = new Audio(
+        "data:audio/mp3;base64," + data.audio
+      );
+
+      audio.play().catch(()=>{});
+    }
+
+  }catch(error){
+
+    thinking.remove();
+
+    addMessage(
+      "ما گدرت أتصل بالخادم. تأكد من إعداد سولا.",
+      "sola"
+    );
+
+  }finally{
+    sendBtn.disabled = false;
+    input.focus();
+  }
+}
+
+function listen(){
+
+  const SpeechRecognition =
+    window.SpeechRecognition ||
+    window.webkitSpeechRecognition;
+
+  if(!SpeechRecognition){
+    addMessage(
+      "المتصفح ما يدعم المايك. جرّب Chrome.",
+      "sola"
+    );
+    return;
+  }
+
+  const recognition = new SpeechRecognition();
+
+  recognition.lang = "ar-IQ";
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+
+  recognition.onstart = function(){
+    input.placeholder = "🎤 سولا تسمعك...";
+  };
+
+  recognition.onresult = function(event){
+
+    const text =
+      event.results[0][0].transcript;
+
+    input.value = text;
+
+    send();
+  };
+
+  recognition.onerror = function(){
+    input.placeholder = "صار خطأ بالمايك";
+  };
+
+  recognition.onend = function(){
+    setTimeout(()=>{
+      input.placeholder = "اكتب رسالتك لسولا...";
+    },1000);
+  };
+
+  recognition.start();
+}
+</script>
+
+</body>
+</html>
